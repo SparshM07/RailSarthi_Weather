@@ -63,10 +63,7 @@ from backend.providers import (
     railradar_headers as _railradar_headers,
 )
 from backend.runtime import RuntimeMetrics, SlidingWindowRateLimiter, TTLCache
-from backend.simulator import (
-    generate_simulated_train_data,
-    get_available_trains_catalog,
-)
+from backend.simulator import get_available_trains_catalog
 from backend.stats import (
     SegmentStatsIndex,
     aggregate_segment_statistics,
@@ -223,7 +220,7 @@ def railradar_headers() -> dict[str, str]:
 
 
 def get_live_data(train_number: int) -> dict[str, Any]:
-    """Retrieve live train data from RailRadar if key is available, else fallback to simulator."""
+    """Retrieve live train data from RailRadar if key is available, else return unavailable."""
     if RAILRADAR_API_KEY and RAILRADAR_API_KEY != "test-key" and not RAILRADAR_API_KEY.startswith("your_"):
         try:
             result = fetch_railradar_live(
@@ -232,15 +229,13 @@ def get_live_data(train_number: int) -> dict[str, Any]:
             result["_provider_mode"] = "LIVE"
             return result
         except Exception as e:
-            logger.warning("Live RailRadar fetch failed for train %d (%s); using resilient simulator", train_number, e)
+            logger.warning("Live RailRadar fetch failed for train %d (%s); returning unavailable.", train_number, e)
     
-    live_sim, _ = generate_simulated_train_data(train_number)
-    live_sim["_provider_mode"] = "SIMULATION_FALLBACK"
-    return live_sim
+    return {"_provider_mode": "LIVE_UNAVAILABLE", "speed": None}
 
 
 def get_route_data(train_number: int) -> dict[str, Any]:
-    """Retrieve route data from RailRadar if key is available, else fallback to simulator."""
+    """Retrieve route data from RailRadar if key is available, else return unavailable."""
     if RAILRADAR_API_KEY and RAILRADAR_API_KEY != "test-key" and not RAILRADAR_API_KEY.startswith("your_"):
         try:
             result = fetch_railradar_route(
@@ -249,11 +244,9 @@ def get_route_data(train_number: int) -> dict[str, Any]:
             result["_provider_mode"] = "LIVE"
             return result
         except Exception as e:
-            logger.warning("Route RailRadar fetch failed for train %d (%s); using resilient simulator", train_number, e)
-    
-    _, route_sim = generate_simulated_train_data(train_number)
-    route_sim["_provider_mode"] = "SIMULATION_FALLBACK"
-    return route_sim
+            logger.warning("Route RailRadar fetch failed for train %d (%s); returning unavailable.", train_number, e)
+            
+    return {"_provider_mode": "LIVE_UNAVAILABLE", "stops": [], "geojson": None}
 
 
 def get_weather(latitude: float, longitude: float) -> dict[str, Any]:
@@ -507,7 +500,7 @@ def list_trains():
 
 @app.get("/health")
 def health():
-    provider_mode = "LIVE_READY" if (RAILRADAR_API_KEY and not RAILRADAR_API_KEY.startswith("your_")) else "SIMULATION_FALLBACK"
+    provider_mode = "LIVE_READY" if (RAILRADAR_API_KEY and not RAILRADAR_API_KEY.startswith("your_")) else "LIVE_UNAVAILABLE"
     return {
         "status": "healthy",
         "service": "RailsArthi",
@@ -568,9 +561,37 @@ def predict(
         require_api_key(request, x_api_key)
         train_number = int(data.train)
 
-        # 1. Fetch live train feed and extract halt information
+        # 1. Fetch external live data
         live_data = get_live_data(train_number)
-        data_provider_mode = live_data.pop("_provider_mode", "SIMULATION_FALLBACK")
+        data_provider_mode = live_data.pop("_provider_mode", "LIVE_UNAVAILABLE")
+        
+        if data_provider_mode == "LIVE_UNAVAILABLE":
+            return {
+                "train": train_number,
+                "train_name": f"Train #{train_number}",
+                "status": "unavailable",
+                "provider_mode": "LIVE_UNAVAILABLE",
+                "current_station": None,
+                "current_station_name": None,
+                "next_station": None,
+                "next_station_name": None,
+                "current_delay_minutes": 0,
+                "segment_progress": 0,
+                "segment_progress_source": "unavailable",
+                "position": {"latitude": None, "longitude": None, "source": "unavailable"},
+                "latitude": None,
+                "longitude": None,
+                "historical_segment": "N/A",
+                "historical_lookup_scope": "N/A",
+                "historical_statistics": {"mean": 0, "median": 0, "std": 0, "count": 0, "reliability": 0},
+                "weather": {"available": False},
+                "upcoming_stations": [],
+                "full_route_schedule": [],
+                "route_geometry": None,
+                "prediction": {"available": False, "note": "Live railway data unavailable"},
+                "speed": None,
+            }
+
         current = live_data.get("currentLocation") or {}
 
         raw_current_station = (
@@ -807,6 +828,8 @@ def predict(
             "previous_train_delay": round(previous_train_delay, 2),
             "weather": {
                 "temperature_c": weather.get("temperature_2m"),
+                "apparent_temperature_c": weather.get("apparent_temperature"),
+                "visibility_m": weather.get("visibility"),
                 "humidity_percent": weather.get("relative_humidity_2m"),
                 "precipitation": weather.get("precipitation"),
                 "rain_mm": weather.get("rain"),
@@ -852,7 +875,9 @@ def predict(
                 "weather_note": "Weather is displayed for context and is not currently a live-model feature.",
             },
             "upcoming_stations": upcoming_eta,
+            "full_route_schedule": route_stops,
             "route_geometry": route_data.get("geojson"),
+            "speed": live_data.get("train", {}).get("speed") or live_data.get("speed"),
             "prediction": {
                 "available": bool(next_station),
                 "note": (
