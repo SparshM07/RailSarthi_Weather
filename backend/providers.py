@@ -140,6 +140,8 @@ def fetch_open_meteo_weather(
         "current": (
             "temperature_2m,"
             "relative_humidity_2m,"
+            "apparent_temperature,"
+            "visibility,"
             "precipitation,"
             "rain,"
             "weather_code,"
