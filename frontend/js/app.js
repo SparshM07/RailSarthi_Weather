@@ -77,7 +77,7 @@ class App {
         this.currentLiveData = null;
         this.trainsCatalog = null;
         this.loadTrainsCatalog();
-        
+
         // Listen for timeline full-route toggle (disconnected from map)
         document.addEventListener('TOGGLE_TIMELINE_FULL_ROUTE', () => {
             this.toggleTimelineFullRoute();
@@ -110,7 +110,7 @@ class App {
     renderShell() {
         this.navContainer.innerHTML = '';
         this.navContainer.appendChild(renderNavbar(this.currentView, this.navigate.bind(this)));
-        
+
         this.footerContainer.innerHTML = '';
         this.footerContainer.appendChild(renderFooter(this.navigate.bind(this)));
     }
@@ -127,7 +127,7 @@ class App {
         this.renderShell();
         this.mountView(viewId);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        
+
         if (viewId !== 'live' && this.autoRefreshInterval) {
             clearInterval(this.autoRefreshInterval);
             this.autoRefreshInterval = null;
@@ -179,8 +179,8 @@ class App {
 
     mountView(viewId) {
         this.appContainer.innerHTML = '';
-        
-        switch(viewId) {
+
+        switch (viewId) {
             case 'home':
                 renderHomeView(this.appContainer);
                 break;
@@ -257,7 +257,7 @@ class App {
         document.addEventListener('RESET_LIVE_SEARCH', () => {
             this.resetLiveTrackingSearch();
         });
-        
+
         document.addEventListener('DO_SEARCH', async (e) => {
             const { train } = e.detail;
             if (!train) return;
@@ -268,12 +268,12 @@ class App {
                 this.mountView('live');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
-            
+
             // Allow DOM to settle
             setTimeout(async () => {
                 const liveInput = document.getElementById('live-train-input');
                 if (liveInput) liveInput.value = train;
-                
+
                 await this.performLiveSearch(train);
             }, 100);
         });
@@ -293,20 +293,20 @@ class App {
         const currentSeq = this.searchSeq;
         this.currentTrain = String(trainNumber);
         store.setSelectedTrain(trainNumber);
-        
+
         try {
             // Show loading state (could add skeleton loaders here)
             const btn = document.querySelector('#live-search-form button');
             const originalBtn = btn ? btn.innerHTML : '';
             if (btn && !isAutoRefresh) btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>';
-            
+
             const emptyState = document.getElementById('empty-state');
             const searchSection = document.getElementById('search-section');
             const dashboard = document.getElementById('tracking-dashboard');
             const mapRouteSection = document.getElementById('map-route-section');
 
             const data = await fetchLivePrediction(trainNumber);
-            
+
             if (currentSeq !== this.searchSeq) {
                 return;
             }
@@ -329,14 +329,14 @@ class App {
                     setTimeout(() => this.mapInstance.resize(), 100);
                 }
             }
-            
+
             if (btn && !isAutoRefresh) btn.innerHTML = originalBtn;
             if (window.lucide) window.lucide.createIcons();
-            
+
             // Now populate all the data
             this.updateLiveDashboard(data);
             this.setupAutoRefresh();
-            
+
             // Update URL
             const newHash = `live?train=${trainNumber}`;
             if (window.location.hash.slice(1) !== newHash) {
@@ -347,13 +347,13 @@ class App {
             if (currentSeq !== this.searchSeq) return;
             alert(error.message);
             const btn = document.querySelector('#live-search-form button');
-            if(btn) btn.innerHTML = 'Check Status &rarr;';
+            if (btn) btn.innerHTML = 'Check Status &rarr;';
         }
     }
 
     setupAutoRefresh() {
         if (this.autoRefreshInterval) clearInterval(this.autoRefreshInterval);
-        
+
         // Auto refresh every 5 minutes (300000ms)
         this.autoRefreshInterval = setInterval(async () => {
             if (this.currentView === 'live' && this.currentTrain) {
@@ -376,7 +376,7 @@ class App {
 
     updateLiveDashboard(data) {
         if (!data) return;
-        
+
         // ===== Train Name and Number & Route =====
         const trainNumInt = parseInt(data.train, 10);
         const catalogItem = this.trainsCatalog?.find(t => t.train_number === trainNumInt);
@@ -386,12 +386,12 @@ class App {
         if (liveTrainInput && data.train) {
             liveTrainInput.value = `${data.train} - ${trainNameStr}`;
         }
-        
+
         const trainNumEl = document.getElementById('train-num');
         if (trainNumEl) {
             trainNumEl.innerHTML = `${data.train || '---'} <span class="text-[#8A9CBE] font-bold">&middot;</span> ${trainNameStr}`;
         }
-        
+
         const trainNameEl = document.getElementById('train-name');
         if (trainNameEl) {
             if (catalogItem) {
@@ -402,11 +402,11 @@ class App {
                 trainNameEl.textContent = 'Live Journey Progress';
             }
         }
-        
+
         // ===== Delay Status (Bug Fix 1: Unified status styling) =====
         const delayMins = Math.round(data.current_delay_minutes || 0);
         const predictedDelayMins = Math.round(data.predicted_delay_minutes || 0);
-        
+
         const delayBox = document.getElementById('delay-alert-box') || (document.getElementById('delay-status-text') ? document.getElementById('delay-status-text').closest('[class*="bg-gradient"]') : null);
         const delayIconBox = document.getElementById('delay-alert-icon-box');
         const delayTitle = document.getElementById('delay-status-title') || (delayBox ? delayBox.querySelector('div:last-child > div:first-child') : null);
@@ -467,23 +467,23 @@ class App {
         if (window.lucide) {
             window.lucide.createIcons();
         }
-        
+
         const totalDelay = document.getElementById('total-delay');
         if (totalDelay) {
             totalDelay.textContent = delayMins > 15 ? `+${delayMins} min` : 'On Time';
             totalDelay.className = delayMins > 15 ? 'font-extrabold text-[#FF3B30] text-[18px]' : 'font-extrabold text-[#34C759] text-[18px]';
         }
-        
+
         // Typical Delay (from historical median)
         const typicalDelay = document.getElementById('typical-delay');
         if (typicalDelay && data.historical_statistics) {
             typicalDelay.textContent = `~ ${Math.round(data.historical_statistics.median)} min`;
         }
-        
+
         // ===== Route Header (True Journey Origin -> Destination) =====
         let originName = 'Origin';
         let destName = 'Destination';
-        
+
         if (catalogItem) {
             originName = catalogItem.source;
             destName = catalogItem.destination;
@@ -492,8 +492,8 @@ class App {
             originName = `${rStops[0].name} (${rStops[0].code})`;
             destName = `${rStops[rStops.length - 1].name} (${rStops[rStops.length - 1].code})`;
         } else {
-            const lastUpcoming = data.upcoming_stations && data.upcoming_stations.length > 0 
-                ? data.upcoming_stations[data.upcoming_stations.length - 1] 
+            const lastUpcoming = data.upcoming_stations && data.upcoming_stations.length > 0
+                ? data.upcoming_stations[data.upcoming_stations.length - 1]
                 : null;
             destName = lastUpcoming ? `${lastUpcoming.station_name || lastUpcoming.station_code} (${lastUpcoming.station_code})` : 'Destination';
             originName = data.origin_station_name || data.source || (data.current_station_name ? `${data.current_station_name} (${data.current_station})` : 'Origin');
@@ -501,38 +501,38 @@ class App {
 
         const progressStart = document.getElementById('progress-start');
         if (progressStart) progressStart.textContent = originName;
-        
+
         const progressEnd = document.getElementById('progress-end');
         if (progressEnd) progressEnd.textContent = destName;
-        
+
         let destinationReached = false;
         if (!data.next_station && data.current_station) {
-             destinationReached = true;
+            destinationReached = true;
         }
-        
+
         // ===== 3-Node Horizontal Timeline =====
         // Node 1: Last Departed Station
         const currStationName = document.getElementById('curr-station-name');
         if (currStationName) currStationName.textContent = data.current_station_name || data.current_station || '---';
-        
+
         const currStationTime = document.getElementById('curr-station-time');
         if (currStationTime) {
             if (data.data_freshness && data.data_freshness.generated_at) {
                 const genDate = new Date(data.data_freshness.generated_at);
-                currStationTime.textContent = !isNaN(genDate.getTime()) 
-                    ? genDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-                    : new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                currStationTime.textContent = !isNaN(genDate.getTime())
+                    ? genDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             } else {
-                currStationTime.textContent = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                currStationTime.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
         }
-        
+
         const currStationStatus = document.getElementById('curr-station-status');
         if (currStationStatus) {
             currStationStatus.textContent = destinationReached ? 'Arrived' : 'Departed';
             currStationStatus.className = 'text-[#34C759] text-[13px] font-bold';
         }
-        
+
         // Node 2: Immediate Next Station
         const nextStationName = document.getElementById('next-station-name');
         if (nextStationName) {
@@ -542,7 +542,7 @@ class App {
                 nextStationName.textContent = data.next_station_name || data.next_station || '---';
             }
         }
-        
+
         let nextRemainingMins = null;
         let nextTimeStr = '--:--';
         if (data.next_station_eta) {
@@ -550,27 +550,27 @@ class App {
             if (!isNaN(arrDate.getTime())) {
                 const diffMs = arrDate.getTime() - Date.now();
                 nextRemainingMins = Math.max(1, Math.round(diffMs / 60000));
-                nextTimeStr = arrDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                nextTimeStr = arrDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
         } else if (data.next_station_eta_minutes) {
             nextRemainingMins = Math.round(data.next_station_eta_minutes);
         }
-        
+
         const nextStationTime = document.getElementById('next-station-time');
         if (nextStationTime) nextStationTime.textContent = destinationReached ? '---' : nextTimeStr;
-        
+
         const nextStationStatus = document.getElementById('next-station-status');
         if (nextStationStatus) {
             if (destinationReached) {
                 nextStationStatus.textContent = 'Destination Reached';
             } else {
-                nextStationStatus.textContent = nextRemainingMins 
-                    ? `Arriving in ${nextRemainingMins} min` 
+                nextStationStatus.textContent = nextRemainingMins
+                    ? `Arriving in ${nextRemainingMins} min`
                     : 'Arriving soon';
             }
             nextStationStatus.className = 'text-[#34C759] text-[13px] font-bold';
         }
-        
+
         // Node 3: Final Destination Station
         const finalStationName = document.getElementById('final-station-name');
         if (finalStationName) {
@@ -594,23 +594,23 @@ class App {
                 finalStationTime.textContent = 'Expected Today';
             }
         }
-        
+
         const finalStationStatus = document.getElementById('final-station-status');
         if (finalStationStatus) {
             finalStationStatus.textContent = destinationReached ? 'Arrived' : '---';
             finalStationStatus.className = destinationReached ? 'text-[#34C759] text-[13px] font-bold' : 'text-[#8A9CBE] text-[13px] font-bold';
         }
-        
+
         // ===== Macro Journey Progress Bar =====
         let progressPct = 0;
         const upcoming = data.upcoming_stations || [];
-        
+
         if (destinationReached) {
             progressPct = 100;
         } else if (upcoming.length > 0) {
             const firstSt = upcoming[0];
             const lastSt = upcoming[upcoming.length - 1];
-            
+
             if (firstSt.sequence != null && lastSt.sequence != null && Number(lastSt.sequence) > 1) {
                 const totalStations = Number(lastSt.sequence);
                 const passedStationsCount = Math.max(0, Number(firstSt.sequence) - 1);
@@ -622,7 +622,7 @@ class App {
                 progressPct = Math.round((currentDist / totalDist) * 100);
             }
         }
-        
+
         // If en route, ensure progress percentage realistically reflects journey (bounded 5% - 95%)
         if (!destinationReached && progressPct <= 0 && data.status !== 'completed') {
             progressPct = Math.max(5, Math.round((data.segment_progress || 0.05) * 100));
@@ -630,34 +630,45 @@ class App {
         if (!destinationReached) {
             progressPct = Math.min(95, Math.max(5, progressPct));
         }
-        
+
         const pctEl = document.getElementById('progress-pct');
         if (pctEl) pctEl.textContent = `${progressPct}%`;
-        
+
         // Update horizontal progress line width + train icon position
+        // Visual timeline has 3 nodes: Current (0%), Next (50%), Final (100%).
+        let visualProgressPct = 0;
+        if (destinationReached) {
+            visualProgressPct = 100;
+        } else {
+            const localProgress = typeof data.segment_progress === 'number' ? Math.max(0, Math.min(1, data.segment_progress)) : 0;
+            // Map localProgress (0 to 1) to visually sit between 15% and 40% of the bar width
+            // This ensures the train is comfortably past the first station, but clearly BEFORE the middle station.
+            visualProgressPct = 15 + (localProgress * 25);
+        }
+
         const progressLine = document.getElementById('progress-line');
-        if (progressLine) progressLine.style.width = `${progressPct}%`;
+        if (progressLine) progressLine.style.width = `${visualProgressPct}%`;
         const trainIcon = document.getElementById('progress-train-icon');
-        if (trainIcon) trainIcon.style.left = `calc(${progressPct}% - 1rem)`;
-        
+        if (trainIcon) trainIcon.style.left = `calc(${visualProgressPct}% - 1rem)`;
+
         // ===== ETA & Times =====
         if (data.next_station_eta) {
             const nextEta = document.getElementById('next-station-eta');
             if (nextEta) nextEta.textContent = nextTimeStr;
-            
+
             const nextRel = document.getElementById('next-station-rel');
             if (nextRel) {
-                const relText = data.predicted_delay_minutes != null 
+                const relText = data.predicted_delay_minutes != null
                     ? `+${Math.round(data.predicted_delay_minutes * 100) / 100} min from schedule`
                     : 'On schedule';
                 nextRel.textContent = relText;
             }
         }
-        
+
         // ===== Weather Widget & Intelligence Card =====
         const weatherTemp = document.getElementById('weather-temp');
         const weatherDesc = document.getElementById('weather-desc');
-        
+
         // New Card Elements
         const cardTemp = document.getElementById('card-weather-temp');
         const cardFeels = document.getElementById('card-weather-feels');
@@ -676,7 +687,7 @@ class App {
 
         if (data.weather) {
             const w = data.weather;
-            
+
             // Top Grid Widget
             if (weatherTemp) {
                 weatherTemp.innerHTML = w.available ? `${w.temperature_c}&deg;C` : '--&deg;C';
@@ -695,7 +706,7 @@ class App {
             if (w.available) {
                 if (cardTemp) cardTemp.innerHTML = `${w.temperature_c}&deg;C`;
                 if (cardFeels) cardFeels.innerHTML = `Feels like ${w.apparent_temperature_c ?? w.temperature_c}&deg;C`;
-                
+
                 if (cardHum) cardHum.textContent = `${w.humidity_percent}%`;
                 if (cardHumDesc) {
                     const h = w.humidity_percent;
@@ -703,7 +714,7 @@ class App {
                     else if (h <= 60) cardHumDesc.textContent = "Comfortable";
                     else cardHumDesc.textContent = "Humid";
                 }
-                
+
                 if (cardWind) cardWind.textContent = `${w.wind_speed_kmh} km/h`;
                 if (cardWindDesc) {
                     const s = w.wind_speed_kmh;
@@ -711,7 +722,7 @@ class App {
                     else if (s <= 30) cardWindDesc.textContent = "Light breeze";
                     else cardWindDesc.textContent = "Windy";
                 }
-                
+
                 if (cardVis) {
                     const v = w.visibility_m;
                     if (v > 10000) {
@@ -719,7 +730,7 @@ class App {
                         if (cardVisDesc) cardVisDesc.innerHTML = "&gt; 10 km";
                     } else if (v > 1000) {
                         cardVis.textContent = "Moderate";
-                        if (cardVisDesc) cardVisDesc.textContent = `${(v/1000).toFixed(1)} km`;
+                        if (cardVisDesc) cardVisDesc.textContent = `${(v / 1000).toFixed(1)} km`;
                     } else {
                         cardVis.textContent = "Poor";
                         if (cardVisDesc) cardVisDesc.textContent = `${v} m`;
@@ -754,10 +765,10 @@ class App {
                 // Telemetry
                 if (telemetryDot) telemetryDot.className = "w-2 h-2 rounded-full bg-[#34C759]";
                 if (telemetryDesc) telemetryDesc.textContent = "Weather data is currently available";
-                
+
                 if (weatherLastUpdated) {
                     const now = new Date();
-                    weatherLastUpdated.textContent = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    weatherLastUpdated.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 }
 
             } else {
@@ -766,11 +777,11 @@ class App {
                 if (telemetryDesc) telemetryDesc.textContent = "Weather feed unavailable";
             }
         }
-        
+
         // ===== Prediction Confidence =====
         const infoConfidence = document.getElementById('info-confidence');
         if (infoConfidence) infoConfidence.textContent = data.eta_confidence || 'LOW';
-        
+
         // ===== Train Run Days =====
         const trainRunDays = document.getElementById('train-run-days');
         if (trainRunDays && data.run_days) {
@@ -782,7 +793,7 @@ class App {
             trainRunDays.innerHTML = `<i data-lucide="calendar" class="w-4 h-4 text-[#1268E8]"></i> ${runText}`;
             if (window.lucide) window.lucide.createIcons();
         }
-        
+
         // ===== Movement Status =====
         const movStatus = document.getElementById('movement-status');
         if (movStatus) {
@@ -800,7 +811,7 @@ class App {
                 movStatus.className = 'font-extrabold text-[#34C759] text-[18px] leading-tight mb-1';
             }
         }
-        
+
         // ===== Platform Widget =====
         const platformNo = document.getElementById('platform-no');
         const platformStation = document.getElementById('platform-station');
@@ -812,13 +823,13 @@ class App {
             if (platformNo) platformNo.textContent = 'PF --';
             if (platformStation) platformStation.textContent = data.next_station_name || '---';
         }
-        
+
         // ===== Zone Widget =====
         // Derive zone from data_freshness provider info or historical segment
         const trainZone = document.getElementById('train-zone');
         if (trainZone) {
             // Use provider_mode as an indicator; we can map common train ranges to zones
-            trainZone.textContent = data.data_freshness && data.data_freshness.provider_mode === 'LIVE' 
+            trainZone.textContent = data.data_freshness && data.data_freshness.provider_mode === 'LIVE'
                 ? 'Indian Railways' : 'Indian Railways';
         }
 
@@ -826,7 +837,7 @@ class App {
         const now = new Date();
         const lastUpdatedEls = document.querySelectorAll('.last-updated-text');
         lastUpdatedEls.forEach(el => el.textContent = `Last updated ${this.getRelativeTime(now)}`);
-        
+
         // Also update the Live Status card's timestamp
         const liveStatusTimestamp = document.querySelector('#tracking-dashboard .text-\\[\\#5C6E94\\].text-\\[14px\\].font-medium');
         if (liveStatusTimestamp && !liveStatusTimestamp.classList.contains('last-updated-text')) {
@@ -837,14 +848,14 @@ class App {
         // Map Section Details
         const mapTrainName = document.getElementById('map-train-name');
         if (mapTrainName) mapTrainName.textContent = `${data.train || ''} ${data.train_name || ''}`;
-        
+
         // Live Speed from API (or placeholder if unavailable)
         const mapTrainSpeed = document.getElementById('map-train-speed');
         const speedText = data.speed ? `${data.speed} km/h` : '-- km/h';
         if (mapTrainSpeed) mapTrainSpeed.textContent = `Speed: ${speedText}`;
         const statSpeed = document.getElementById('stat-speed');
         if (statSpeed) statSpeed.textContent = speedText;
-        
+
         const mapTrainStatus = document.getElementById('map-train-status');
         if (mapTrainStatus) {
             if (data.provider_mode === 'LIVE_UNAVAILABLE') {
@@ -853,10 +864,10 @@ class App {
                 mapTrainStatus.textContent = delayMins > 15 ? 'Delayed' : 'Running On Time';
             }
         }
-        
+
         const statNextStation = document.getElementById('stat-next-station');
         if (statNextStation) statNextStation.textContent = data.next_station_name || data.next_station || '---';
-        
+
         const statNextRel = document.getElementById('stat-next-rel');
         if (statNextRel) {
             let relMins = null;
@@ -871,23 +882,23 @@ class App {
             }
             statNextRel.textContent = relMins ? `Arriving in ${relMins} min` : '---';
         }
-        
+
         const statEta = document.getElementById('stat-eta');
         if (statEta && data.next_station_eta) {
             const date = new Date(data.next_station_eta);
-            statEta.textContent = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            statEta.textContent = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
-        
+
         const statEtaLoc = document.getElementById('stat-eta-location');
         if (statEtaLoc) statEtaLoc.textContent = `At ${data.next_station_name || data.next_station || 'Destination'}`;
-        
+
         const statRouteNames = document.getElementById('stat-route-names');
         if (statRouteNames) statRouteNames.textContent = `${data.current_station_name || data.current_station || 'Origin'} → ${data.next_station_name || data.next_station || 'Destination'}`;
-        
+
         // Save current live data and render timeline station list
         this.currentLiveData = data;
         this.renderTimeline(data, this.isShowingFullRoute);
-        
+
         // Map (MapLibre GL with complete route, stations & live train telemetry)
         if (data.position && data.position.latitude && data.position.longitude) {
             this.updateMap(data.position.latitude, data.position.longitude, data.route_geometry, data);
@@ -908,7 +919,7 @@ class App {
         return this.stationsCache || {};
     }
 
-        async loadTrainsCatalog() {
+    async loadTrainsCatalog() {
         if (this.trainsCatalog) return this.trainsCatalog;
         try {
             const res = await fetchTrainsCatalog();
@@ -922,7 +933,7 @@ class App {
 
     toggleTimelineFullRoute() {
         this.isShowingFullRoute = !this.isShowingFullRoute;
-        
+
         const fullRouteBtn = document.getElementById('view-full-route-btn');
         if (fullRouteBtn) {
             const btnText = fullRouteBtn.querySelector('.btn-text');
@@ -972,7 +983,7 @@ class App {
                         arrivalVal = catalogStop.sch_arr || catalogStop.sch_dep;
                     }
                 }
-                
+
                 if (idx === 0 || idx === fullRoute.length - 1 || s.code === data.current_station || s.code === data.next_station) {
                     isMajor = true;
                 }
@@ -1026,10 +1037,10 @@ class App {
         let currentGroup = null;
 
         stations.forEach((st, idx) => {
-            const isMain = showFullRoute ? true : ((st.is_halt !== undefined) 
-                ? st.is_halt 
+            const isMain = showFullRoute ? true : ((st.is_halt !== undefined)
+                ? st.is_halt
                 : (st.is_stop !== undefined ? st.is_stop : (idx === 0 || idx === stations.length - 1 || idx % 2 === 0)));
-            
+
             if (isMain) {
                 if (currentGroup) groups.push(currentGroup);
                 currentGroup = { main: st, index: idx, intermediate: [] };
@@ -1061,7 +1072,7 @@ class App {
             const isLastGroup = gIdx === groups.length - 1;
             const isPast = group.main.status === 'Departed' || group.main.status === 'Passed';
             const isNext = !isPast && (gIdx === nextGroupIndex);
-            
+
             let timeStr = '--:--';
             const rawArrival = group.main.arrivalVal || group.main.predicted_arrival || group.main.scheduled_arrival;
             if (rawArrival) {
@@ -1070,17 +1081,17 @@ class App {
                 } else {
                     const d = new Date(rawArrival);
                     if (!isNaN(d.getTime())) {
-                        timeStr = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     }
                 }
             }
-            
-            let dotClass = 'w-4 h-4 bg-white border-[3px] border-[#8A9CBE] rounded-full z-10'; 
+
+            let dotClass = 'w-4 h-4 bg-white border-[3px] border-[#8A9CBE] rounded-full z-10';
             let lineClass = 'w-0.5 bg-[#8A9CBE] opacity-30 absolute top-4 bottom-0 left-[7px] -z-0';
             let nameClass = 'font-bold text-[#071B4A] text-[15px]';
             let statusText = 'Scheduled';
             let statusClass = 'text-[#8A9CBE] text-[13px] font-medium';
-            
+
             if (isPast) {
                 dotClass = 'w-4 h-4 bg-[#34C759] rounded-full z-10';
                 lineClass = 'w-0.5 bg-[#A1E4B5] absolute top-4 bottom-0 left-[7px] -z-0';
@@ -1090,7 +1101,7 @@ class App {
             } else if (isNext) {
                 dotClass = 'w-4 h-4 bg-[#1268E8] rounded-full z-10 shadow-[0_0_0_4px_rgba(18,104,232,0.15)]';
                 nameClass = 'font-bold text-[#1268E8] text-[15px]';
-                
+
                 let diffMins = null;
                 if (rawArrival && !timeStr.includes('-')) {
                     const arrivalDate = new Date(rawArrival.includes('T') ? rawArrival : new Date().toDateString() + ' ' + rawArrival);
@@ -1099,20 +1110,20 @@ class App {
                         diffMins = Math.max(1, Math.round(diffMs / 60000));
                     }
                 }
-                
-                statusText = diffMins !== null 
-                    ? `Arriving in ${diffMins} min` 
+
+                statusText = diffMins !== null
+                    ? `Arriving in ${diffMins} min`
                     : (data.next_station_eta_minutes ? `Arriving in ${Math.round(data.next_station_eta_minutes)} min` : 'Arriving soon');
                 statusClass = 'text-[#34C759] text-[13px] font-bold';
             } else if (isLastGroup) {
                 dotClass = 'w-4 h-4 bg-[#1268E8] rounded-full z-10';
-                lineClass = 'hidden'; 
+                lineClass = 'hidden';
                 statusText = 'Expected Today';
             }
 
             const groupContainer = document.createElement('div');
             groupContainer.className = 'main-station-group';
-            
+
             let html = `
                 <div class="relative flex gap-4 ${group.intermediate.length > 0 ? 'pb-2' : (isLastGroup ? 'pb-0' : 'pb-8')}">
                     <div class="relative flex flex-col items-center mt-1 w-4">
@@ -1135,14 +1146,14 @@ class App {
             if (group.intermediate.length > 0) {
                 html += `<div class="intermediate-stations hidden pl-2 relative">`;
                 html += `<div class="w-0.5 bg-[#8A9CBE] opacity-30 absolute top-0 bottom-0 left-[7px] -z-0"></div>`;
-                
+
                 group.intermediate.forEach((ist) => {
                     let iTimeStr = '--:--';
                     const iArrivalVal = ist.predicted_arrival || ist.scheduled_arrival;
                     if (iArrivalVal) {
-                        iTimeStr = new Date(iArrivalVal).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        iTimeStr = new Date(iArrivalVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     }
-                    
+
                     html += `
                         <div class="relative flex gap-4 pb-4">
                             <div class="relative flex flex-col items-center mt-1.5 w-4">
@@ -1159,9 +1170,9 @@ class App {
                         </div>
                     `;
                 });
-                
+
                 html += `</div>`;
-                
+
                 // Toggle Button
                 html += `
                     <div class="relative flex gap-4 pb-6 mt-1">
@@ -1184,7 +1195,7 @@ class App {
                 const group = e.target.closest('.main-station-group');
                 const intermediateContainer = group.querySelector('.intermediate-stations');
                 const icon = btn.querySelector('i');
-                
+
                 if (intermediateContainer.classList.contains('hidden')) {
                     intermediateContainer.classList.remove('hidden');
                     icon.setAttribute('data-lucide', 'chevron-up');
@@ -1316,7 +1327,7 @@ class App {
         const trainNum = parseInt(fullData.train, 10);
         const upcoming = fullData.upcoming_stations || [];
         const nextCode = fullData.next_station;
-        
+
         // 1. Origin Station
         let originPoint = null;
         if (POPULAR_TRAIN_ROUTES[trainNum] && POPULAR_TRAIN_ROUTES[trainNum].length > 0) {
@@ -1493,7 +1504,7 @@ class App {
         keyMarkers.forEach(st => {
             const el = document.createElement('div');
             el.className = 'station-pin-marker';
-            
+
             let dotStyle = '';
             let labelStyle = '';
             if (st.type === 'origin') {
@@ -1616,7 +1627,7 @@ class App {
         this.simulatedCondition = condition;
         const fromStation = from || document.getElementById('sim-from')?.options[document.getElementById('sim-from')?.selectedIndex]?.text || 'Indore (INDB)';
         const toStation = to || document.getElementById('sim-to')?.options[document.getElementById('sim-to')?.selectedIndex]?.text || 'New Delhi (NDLS)';
-        
+
         let dynamicDelay = 250;
         if (condition === 'normal') dynamicDelay = 30;
         else if (condition === 'monsoon') dynamicDelay = 250;
@@ -1629,7 +1640,7 @@ class App {
         // Update stats on right panel to reflect new scenario
         const simPredDelayEl = document.getElementById('sim-predicted-delay');
         if (simPredDelayEl) simPredDelayEl.textContent = `+${dynamicDelay} min`;
-        
+
         const simEtaDiffEl = document.getElementById('sim-eta-diff');
         if (simEtaDiffEl) {
             const h = Math.floor(dynamicDelay / 60);
@@ -1672,7 +1683,7 @@ class App {
         const btn = document.querySelector('#simulator-form button');
 
         if (!resultContainer || !btn) return;
-        
+
         const originalBtn = btn.innerHTML;
         btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>';
         if (window.lucide) window.lucide.createIcons({ root: btn });
@@ -1712,13 +1723,13 @@ class App {
             document.getElementById('sim-duration-val').textContent = `${Math.floor(data.scheduled_duration_minutes / 60)}h ${data.scheduled_duration_minutes % 60}m`;
             document.getElementById('sim-input-delay-val').textContent = `${features.currentDelay} min`;
             document.getElementById('sim-predicted-delay').textContent = `+${predictedDelay} min`;
-            
+
             // Build Chart with dynamic From/To stations
             this.renderSimChart(predictedDelay, features.from, features.to);
-            
+
             // Build Comparisons with dynamic condition
             this.renderSimComparisons(predictedDelay, features.condition);
-            
+
             if (window.lucide) window.lucide.createIcons({ root: resultContainer });
 
         } catch (error) {
@@ -1931,7 +1942,7 @@ class App {
                         ticks: {
                             color: '#5C6E94',
                             font: { size: 10, weight: '600', family: 'Inter, sans-serif' },
-                            callback: function(val, index) {
+                            callback: function (val, index) {
                                 return stations[index].split('\n');
                             }
                         }
