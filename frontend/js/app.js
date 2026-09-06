@@ -7,7 +7,7 @@ import { renderInsightsView } from './views/InsightsView.js';
 import { renderAlertsView } from './views/AlertsView.js';
 import { renderAboutView } from './views/AboutView.js';
 import { renderModelView } from './views/StaticViews.js';
-import { fetchLivePrediction, fetchJourneyPrediction, fetchTrainsCatalog } from './api.js';
+import { fetchLivePrediction, fetchJourneyPrediction, fetchTrainsCatalog, fetchSimulationPrediction } from './api.js';
 
 // Predefined authoritative train routes for full-route journey tracking
 const POPULAR_TRAIN_ROUTES = {
@@ -1678,84 +1678,38 @@ class App {
         if (window.lucide) window.lucide.createIcons({ root: btn });
 
         try {
-            // Map the simplified UI features to the complex 40-feature model requirements
-            const trainType = features.trainType.includes('Rajdhani')
-                ? 'Rajdhani Express'
-                : features.trainType.includes('Vande Bharat')
-                    ? 'Vande Bharat Express'
-                    : features.trainType.includes('Shatabdi')
-                        ? 'Shatabdi Express'
-                        : features.trainType.includes('Mangala')
-                            ? 'Superfast Express'
-                            : 'Superfast Express';
             const payload = {
-                train_number: Number(features.train),
-                train_type: trainType,
-                year: 2024,
-                month: 9,
-                day_of_week: 1,
-                departure_hour: 10,
-                is_weekend: 0,
-                is_night_departure: 0,
-                is_peak_hour: 1,
-                is_festival_season: features.condition === 'festival' ? 1 : 0,
-                season: features.condition === 'monsoon' ? 'Monsoon' : (features.condition === 'fog' ? 'Winter/Fog' : 'Pre-Monsoon'),
-                zone: features.zone,
-                zone_abbr: features.zone.match(/\(([^)]+)\)/)?.[1] || 'NR',
-                source_station_category: 'A1',
-                destination_station_category: 'A',
-                distance_km: features.distance,
-                num_scheduled_stops: Math.floor(features.distance / 60),
-                scheduled_travel_hours: features.distance / 60, // Assuming 60km/h avg
-                track_doubled: 1,
-                is_hdn_route: 1,
-                traction_type: 'Electric (25kV AC)',
-                is_electrified: 1,
-                psr_count: 5,
-                is_circular_route: 0,
-                is_monsoon_season: features.condition === 'monsoon' ? 1 : 0,
-                is_fog_risk: features.condition === 'fog' ? 1 : 0,
-                fog_risk_score: features.condition === 'fog' ? 0.8 : 0.1,
-                zone_fog_index: features.condition === 'fog' ? 0.9 : 0.2,
-                zone_congestion_index: features.condition === 'congestion' ? 0.95 : (features.condition === 'festival' ? 0.85 : 0.4),
-                season_severity_score: features.condition === 'normal' ? 0.2 : 0.8,
-                loco_age_years: 5,
-                coach_age_years: 3,
-                has_lhb_coaches: 1,
-                is_rake_shared: 0,
-                maintenance_score: 8.5,
-                seat_utilisation_pct: features.condition === 'festival' ? 1.25 : 0.85,
-                is_overloaded: (features.condition === 'festival' || features.condition === 'congestion') ? 1 : 0,
-                late_incoming_rake: features.condition === 'festival' ? 1 : 0,
-                is_special_train: 0,
-                route_historical_ontime_pct: features.condition === 'congestion' ? 45.0 : (features.condition === 'monsoon' ? 50.0 : 85.5)
+                train: Number(features.train),
+                date: '2026-09-04', // Dummy values as Simulator no longer asks for Date/Time
+                time: '12:00',
+                from_station: features.from,
+                to_station: features.to,
+                scenario: features.condition,
+                current_delay: Number(features.currentDelay) || 0
             };
 
-            const data = await fetchJourneyPrediction(payload);
+            const data = await fetchSimulationPrediction(payload);
 
-            const predictedDelay = Math.round(data.predicted_destination_delay_minutes || 0);
-            const [hours, minutes] = features.time.split(':').map(Number);
-            const scheduledMinutes = hours * 60 + minutes;
-            const arrivalMinutes = scheduledMinutes + predictedDelay;
-            const formatTime = (totalMinutes) => {
-                const normalized = ((totalMinutes % 1440) + 1440) % 1440;
-                const hour = normalized / 60;
-                const minute = normalized % 60;
-                const suffix = hour >= 12 ? 'PM' : 'AM';
-                const displayHour = hour % 12 || 12;
-                return `${String(displayHour).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${suffix}`;
+            const predictedDelay = data.predicted_delay_minutes || 0;
+            const scheduledDuration = data.scheduled_duration_minutes || 0;
+            const predictedDuration = data.total_predicted_duration_minutes || 0;
+            const formatDuration = (totalMinutes) => {
+                const hours = Math.floor(totalMinutes / 60);
+                const mins = Math.floor(totalMinutes % 60);
+                return `${hours}h ${mins}m`;
             };
 
             document.getElementById('sim-dest-label').textContent = features.to;
-            document.getElementById('sim-eta-time').textContent = formatTime(arrivalMinutes);
-            document.getElementById('sim-sch-time').textContent = formatTime(scheduledMinutes);
+            document.getElementById('sim-eta-time').textContent = formatDuration(predictedDuration);
+            document.getElementById('sim-sch-time').textContent = formatDuration(scheduledDuration);
             document.getElementById('sim-eta-diff').textContent = predictedDelay ? `+${predictedDelay} min delay` : 'On schedule';
-            document.getElementById('sim-risk-level').textContent = data.is_predicted_delayed ? 'High' : 'Low';
-            document.getElementById('sim-risk-level').className = `font-extrabold text-[28px] leading-tight ${data.is_predicted_delayed ? 'text-[#FF9500]' : 'text-[#34C759]'}`;
-            document.getElementById('sim-risk-desc').textContent = data.is_predicted_delayed ? `>${data.delay_threshold_minutes} min likely` : 'Within schedule buffer';
-            document.getElementById('sim-confidence').textContent = `${data.is_predicted_delayed ? 78 : 91}%`;
-            document.getElementById('sim-distance-val').textContent = `${features.distance} km`;
-            document.getElementById('sim-duration-val').textContent = `${Math.floor(features.distance / 60)}h ${Math.round(features.distance % 60)}m`;
+            const isDelayed = predictedDelay > 15;
+            document.getElementById('sim-risk-level').textContent = isDelayed ? 'High' : 'Low';
+            document.getElementById('sim-risk-level').className = `font-extrabold text-[28px] leading-tight ${isDelayed ? 'text-[#FF9500]' : 'text-[#34C759]'}`;
+            document.getElementById('sim-risk-desc').textContent = isDelayed ? `>15 min likely due to ${data.weather_impact || features.condition}` : 'Within schedule buffer';
+            document.getElementById('sim-confidence').textContent = `85%`; // Constant or fetched if ML returns confidence
+            document.getElementById('sim-distance-val').textContent = `${data.distance_km} km`;
+            document.getElementById('sim-duration-val').textContent = `${Math.floor(data.scheduled_duration_minutes / 60)}h ${data.scheduled_duration_minutes % 60}m`;
             document.getElementById('sim-input-delay-val').textContent = `${features.currentDelay} min`;
             document.getElementById('sim-predicted-delay').textContent = `+${predictedDelay} min`;
             

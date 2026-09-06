@@ -411,6 +411,16 @@ class JourneyPredictionInput(BaseModel):
     )
 
 
+class SimulationInput(BaseModel):
+    train: int
+    date: str
+    time: str
+    from_station: str
+    to_station: str
+    scenario: str
+    current_delay: int = 0
+
+
 def require_api_key(
     request: Request,
     x_api_key: str | None = Header(default=None),
@@ -507,6 +517,25 @@ def list_trains():
     }
 
 
+@app.get("/route/{train_number}")
+def get_train_route(
+    train_number: int,
+    request: Request,
+    x_api_key: str | None = Header(default=None),
+):
+    """Return the scheduled stops (route) for a specific train."""
+    try:
+        require_api_key(request, x_api_key)
+        route_data = get_route_data(train_number)
+        return {
+            "status": "success",
+            "train": train_number,
+            "stops": route_data.get("stops", []),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @app.get("/health")
 def health():
     provider_mode = "LIVE_READY" if (RAILRADAR_API_KEY and not RAILRADAR_API_KEY.startswith("your_")) else "SIMULATION_FALLBACK"
@@ -558,6 +587,106 @@ def predict_journey(
         result["validation"] = journey_model_metrics
         result["validation_metrics"] = journey_model_metrics
     return result
+
+
+@app.post("/simulate")
+def simulate_journey(
+    data: SimulationInput,
+    request: Request,
+    x_api_key: str | None = Header(default=None),
+):
+    try:
+        require_api_key(request, x_api_key)
+        route_data = get_route_data(data.train)
+        stops = route_data.get("stops", [])
+        
+        start_lat, start_lng = None, None
+        end_lat, end_lng = None, None
+        
+        for stop in stops:
+            if stop.get("code") == data.from_station:
+                start_lat = stop.get("lat")
+                start_lng = stop.get("lng")
+            if stop.get("code") == data.to_station:
+                end_lat = stop.get("lat")
+                end_lng = stop.get("lng")
+        
+        if start_lat is None or end_lat is None:
+            distance_km = 150.0
+            scheduled_mins = 120.0
+        else:
+            # Haversine distance
+            import math
+            R = 6371.0
+            lat1, lon1 = math.radians(start_lat), math.radians(start_lng)
+            lat2, lon2 = math.radians(end_lat), math.radians(end_lng)
+            dlon = lon2 - lon1
+            dlat = lat2 - lat1
+            a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            distance_km = R * c
+            
+            # Rail distance is approx 1.2x straight line distance
+            distance_km *= 1.2 
+            scheduled_mins = distance_km * 1.0  # Appx 60 km/h scheduled speed
+
+        base_delay = data.current_delay
+        multiplier = 1.0
+        weather_desc = "Clear weather"
+        if data.scenario == "monsoon":
+            multiplier = 1.25
+            weather_desc = "Heavy Rain (-20% speed)"
+        elif data.scenario == "fog":
+            multiplier = 1.40
+            weather_desc = "Dense Fog (-30% speed)"
+        elif data.scenario == "congestion":
+            multiplier = 1.15
+            weather_desc = "High Congestion"
+        elif data.scenario == "festival":
+            multiplier = 1.10
+            weather_desc = "Festival Rush"
+            
+        model_input = {
+            "train": str(data.train),
+            "station": data.from_station,
+            "next_station": data.to_station,
+            "current_arr_delay": base_delay,
+            "scheduled_segment_minutes": scheduled_mins,
+            "past_segment_mean": scheduled_mins * 0.1,
+            "past_segment_median": scheduled_mins * 0.1,
+            "past_segment_std": 5.0,
+            "past_segment_count": 30,
+            "day_of_week": 1,
+            "month": 9,
+            "is_weekend": 0,
+            "previous_train_delay": base_delay,
+        }
+        
+        if champion_container:
+            features_df = prepare_model_dataframe(model_input)
+            predicted_segment_delay = max(0.0, float(champion_container.predict(features_df)))
+        else:
+            predicted_segment_delay = (scheduled_mins * 0.1) + base_delay
+            
+        final_delay = base_delay + (predicted_segment_delay * multiplier)
+        if data.scenario == "monsoon": final_delay += (distance_km / 60) * 15
+        if data.scenario == "fog": final_delay += (distance_km / 60) * 30
+        
+        final_delay_rounded = math.ceil(final_delay)
+        distance_rounded = math.ceil(distance_km)
+        total_time_mins = math.ceil(scheduled_mins + final_delay)
+        
+        return {
+            "status": "success",
+            "distance_km": distance_rounded,
+            "scheduled_duration_minutes": math.ceil(scheduled_mins),
+            "predicted_delay_minutes": final_delay_rounded,
+            "total_predicted_duration_minutes": total_time_mins,
+            "weather_impact": weather_desc
+        }
+    except Exception as e:
+        logger.exception("Simulation failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/predict")

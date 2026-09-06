@@ -76,28 +76,6 @@ export function renderSimulatorView(appContainer) {
                                 </div>
                             </div>
 
-                            <!-- Date & Time -->
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-[12px] font-bold text-[#5C6E94] mb-1.5">Journey Date</label>
-                                    <div class="relative">
-                                        <div class="absolute inset-y-0 left-3.5 flex items-center pointer-events-none">
-                                            <i data-lucide="calendar" class="w-4 h-4 text-[#8A9CBE]"></i>
-                                        </div>
-                                        <input type="date" id="sim-date" value="2026-09-04" class="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-3 py-2.5 text-[14px] text-[#071B4A] font-medium outline-none focus:ring-2 focus:ring-blue-100 transition-all shadow-sm cursor-text" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-[12px] font-bold text-[#5C6E94] mb-1.5">Time</label>
-                                    <div class="relative">
-                                        <div class="absolute inset-y-0 left-3.5 flex items-center pointer-events-none">
-                                            <i data-lucide="clock" class="w-4 h-4 text-[#8A9CBE]"></i>
-                                        </div>
-                                        <input type="time" id="sim-time" value="14:30" class="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-3 py-2.5 text-[14px] text-[#071B4A] font-medium outline-none focus:ring-2 focus:ring-blue-100 transition-all shadow-sm cursor-text" />
-                                    </div>
-                                </div>
-                            </div>
-
                             <!-- From & To -->
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
@@ -246,10 +224,10 @@ export function renderSimulatorView(appContainer) {
                                 <div class="bg-white rounded-xl p-4 border border-blue-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden">
                                     <div class="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
                                     <div class="text-[11px] text-[#071B4A] font-bold mb-1 flex items-center justify-center gap-1">
-                                        <i data-lucide="clock" class="w-3.5 h-3.5 text-[#1268E8]"></i> Estimated Arrival at <span id="sim-dest-label">New Delhi</span>
+                                        <i data-lucide="clock" class="w-3.5 h-3.5 text-[#1268E8]"></i> Expected Journey Duration
                                     </div>
-                                    <div class="font-extrabold text-[#071B4A] text-[22px]" id="sim-eta-time">03:16 PM</div>
-                                    <div class="text-[10px] text-[#8A9CBE] mt-0.5">Scheduled: <span id="sim-sch-time">11:06 AM</span></div>
+                                    <div class="font-extrabold text-[#071B4A] text-[22px]" id="sim-eta-time">--</div>
+                                    <div class="text-[10px] text-[#8A9CBE] mt-0.5">Scheduled: <span id="sim-sch-time">--</span></div>
                                     <div class="text-[#FF3B30] font-bold text-[12px] mt-1" id="sim-eta-diff">+250 min (4h 10m)</div>
                                 </div>
                                 <div class="bg-white rounded-xl p-4 border border-red-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden">
@@ -362,6 +340,53 @@ export function renderSimulatorView(appContainer) {
         window.lucide.createIcons({ root: view });
     }
 
+    // Dynamic station loading based on train number
+    const trainInput = view.querySelector('#sim-train');
+    const fromSelect = view.querySelector('#sim-from');
+    const toSelect = view.querySelector('#sim-to');
+
+    if (trainInput && fromSelect && toSelect) {
+        let debounceTimer;
+        trainInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            const trainNo = e.target.value.trim();
+            if (trainNo.length === 5 && !isNaN(trainNo)) {
+                debounceTimer = setTimeout(async () => {
+                    try {
+                        const response = await fetch(`/route/${trainNo}`);
+                        const data = await response.json();
+                        if (data.status === 'success' && data.stops && data.stops.length > 0) {
+                            fromSelect.innerHTML = '';
+                            toSelect.innerHTML = '';
+                            data.stops.forEach((stop, index) => {
+                                const optionText = `${stop.name} (${stop.code})`;
+                                const optionValue = stop.code;
+                                
+                                const fromOption = document.createElement('option');
+                                fromOption.value = optionValue;
+                                fromOption.textContent = optionText;
+                                fromSelect.appendChild(fromOption);
+                                
+                                const toOption = document.createElement('option');
+                                toOption.value = optionValue;
+                                toOption.textContent = optionText;
+                                toSelect.appendChild(toOption);
+                            });
+                            // Select first and last by default
+                            fromSelect.selectedIndex = 0;
+                            toSelect.selectedIndex = toSelect.options.length - 1;
+                        }
+                    } catch (err) {
+                        console.error('Failed to load route:', err);
+                    }
+                }, 500);
+            }
+        });
+        
+        // Trigger once on load to populate defaults for 12919
+        trainInput.dispatchEvent(new Event('input'));
+    }
+
     // Set up form submission event
     const form = view.querySelector('#simulator-form');
     if (form) {
@@ -373,10 +398,8 @@ export function renderSimulatorView(appContainer) {
             const features = {
                 train: document.getElementById('sim-train').value,
                 trainType: 'Unknown',
-                date: document.getElementById('sim-date').value,
-                time: document.getElementById('sim-time').value,
-                from: document.getElementById('sim-from').options[document.getElementById('sim-from').selectedIndex].text,
-                to: document.getElementById('sim-to').options[document.getElementById('sim-to').selectedIndex].text,
+                from: document.getElementById('sim-from').value,
+                to: document.getElementById('sim-to').value,
                 zone: 'Northern Railway (NR)',
                 distance: 846,
                 condition: activeCondition ? activeCondition.dataset.condition : 'monsoon',

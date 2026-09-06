@@ -68,3 +68,30 @@ export async function fetchJourneyPrediction(features) {
         throw error;
     }
 }
+
+/**
+ * Fetch simulated route/journey prediction
+ * @param {Object} payload
+ */
+export async function fetchSimulationPrediction(payload) {
+    try {
+        const response = await fetch('/simulate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': 'aogeHMHN6l52NLh6xoRSIFTD94RFq61klNEuSuwiVTQ'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || 'Simulation failed');
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('Error in simulation:', error);
+        throw error;
+    }
+}
