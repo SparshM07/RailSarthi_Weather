@@ -1303,8 +1303,8 @@ class App {
             }
         }
 
-        // Live Train Marker (Pulsing marker)
-        this.updateTrainMarker(trainCoords, trainNum, trainName, delayStatusText, delayColor);
+        // Live Train Marker (Pulsing marker) + Weather Radar
+        this.updateTrainMarker(trainCoords, trainNum, trainName, delayStatusText, delayColor, fullData.weather);
     }
 
     async renderRouteAndStations(routeCoordinates, fullData, trainCoords) {
@@ -1547,9 +1547,48 @@ class App {
         });
     }
 
-    updateTrainMarker(trainCoords, trainNum, trainName, delayStatusText, delayColor) {
+    updateTrainMarker(trainCoords, trainNum, trainName, delayStatusText, delayColor, weather) {
         if (!this.mapInstance) return;
 
+        // --- Weather Radar Overlay ---
+        if (weather) {
+            let weatherColor = 'rgba(156, 163, 175, 0.4)'; // Default gray for fog/clouds
+            let weatherLabel = weather.condition || 'Cloudy';
+            
+            if (weather.condition && weather.condition.toLowerCase().includes('rain')) {
+                weatherColor = 'rgba(59, 130, 246, 0.4)'; // Blue for rain
+            } else if (weather.condition && weather.condition.toLowerCase().includes('clear')) {
+                weatherColor = 'rgba(250, 204, 21, 0.3)'; // Yellow for clear
+            } else if (weather.condition && weather.condition.toLowerCase().includes('fog')) {
+                weatherColor = 'rgba(156, 163, 175, 0.5)';
+            }
+
+            if (!this.weatherMarker) {
+                const wEl = document.createElement('div');
+                wEl.className = 'weather-radar-marker';
+                wEl.innerHTML = `
+                    <div class="animate-pulse" style="width: 250px; height: 250px; background: ${weatherColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); border: 1px solid rgba(255,255,255,0.3);">
+                        <div style="position: absolute; top: 10px; background: rgba(0,0,0,0.6); color: white; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; backdrop-filter: blur(4px);">
+                            <i data-lucide="cloud" style="width:12px; height:12px; display:inline-block; margin-right:4px;"></i>${weatherLabel} Zone
+                        </div>
+                    </div>
+                `;
+                this.weatherMarker = new window.maplibregl.Marker({ element: wEl })
+                    .setLngLat(trainCoords)
+                    .addTo(this.mapInstance);
+            } else {
+                this.weatherMarker.setLngLat(trainCoords);
+            }
+            if (window.lucide && !this.weatherMarkerIconRendered) {
+                window.lucide.createIcons({ root: this.weatherMarker.getElement() });
+                this.weatherMarkerIconRendered = true;
+            }
+        } else if (this.weatherMarker) {
+            this.weatherMarker.remove();
+            this.weatherMarker = null;
+        }
+
+        // --- Live Train Marker ---
         if (!this.trainMarker) {
             const el = document.createElement('div');
             el.className = 'train-live-marker-wrapper';
