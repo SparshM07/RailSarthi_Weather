@@ -505,6 +505,11 @@ class App {
         const progressEnd = document.getElementById('progress-end');
         if (progressEnd) progressEnd.textContent = destName;
         
+        let destinationReached = false;
+        if (!data.next_station && data.current_station) {
+             destinationReached = true;
+        }
+        
         // ===== 3-Node Horizontal Timeline =====
         // Node 1: Last Departed Station
         const currStationName = document.getElementById('curr-station-name');
@@ -524,13 +529,19 @@ class App {
         
         const currStationStatus = document.getElementById('curr-station-status');
         if (currStationStatus) {
-            currStationStatus.textContent = 'Departed';
+            currStationStatus.textContent = destinationReached ? 'Arrived' : 'Departed';
             currStationStatus.className = 'text-[#34C759] text-[13px] font-bold';
         }
         
         // Node 2: Immediate Next Station
         const nextStationName = document.getElementById('next-station-name');
-        if (nextStationName) nextStationName.textContent = data.next_station_name || data.next_station || '---';
+        if (nextStationName) {
+            if (destinationReached) {
+                nextStationName.textContent = 'Journey Completed';
+            } else {
+                nextStationName.textContent = data.next_station_name || data.next_station || '---';
+            }
+        }
         
         let nextRemainingMins = null;
         let nextTimeStr = '--:--';
@@ -546,13 +557,17 @@ class App {
         }
         
         const nextStationTime = document.getElementById('next-station-time');
-        if (nextStationTime) nextStationTime.textContent = nextTimeStr;
+        if (nextStationTime) nextStationTime.textContent = destinationReached ? '---' : nextTimeStr;
         
         const nextStationStatus = document.getElementById('next-station-status');
         if (nextStationStatus) {
-            nextStationStatus.textContent = nextRemainingMins 
-                ? `Arriving in ${nextRemainingMins} min` 
-                : 'Arriving soon';
+            if (destinationReached) {
+                nextStationStatus.textContent = 'Destination Reached';
+            } else {
+                nextStationStatus.textContent = nextRemainingMins 
+                    ? `Arriving in ${nextRemainingMins} min` 
+                    : 'Arriving soon';
+            }
             nextStationStatus.className = 'text-[#34C759] text-[13px] font-bold';
         }
         
@@ -565,21 +580,34 @@ class App {
             } else if (data.upcoming_stations && data.upcoming_stations.length > 0) {
                 const lastStation = data.upcoming_stations[data.upcoming_stations.length - 1];
                 finalName = lastStation.station_name || lastStation.station_code;
+            } else if (destinationReached) {
+                finalName = data.current_station_name || data.current_station;
             }
             finalStationName.textContent = finalName;
         }
 
         const finalStationTime = document.getElementById('final-station-time');
-        if (finalStationTime) finalStationTime.textContent = 'Expected Today';
+        if (finalStationTime) {
+            if (destinationReached) {
+                finalStationTime.textContent = currStationTime ? currStationTime.textContent : 'Arrived';
+            } else {
+                finalStationTime.textContent = 'Expected Today';
+            }
+        }
         
         const finalStationStatus = document.getElementById('final-station-status');
-        if (finalStationStatus) finalStationStatus.textContent = '---';
+        if (finalStationStatus) {
+            finalStationStatus.textContent = destinationReached ? 'Arrived' : '---';
+            finalStationStatus.className = destinationReached ? 'text-[#34C759] text-[13px] font-bold' : 'text-[#8A9CBE] text-[13px] font-bold';
+        }
         
         // ===== Macro Journey Progress Bar =====
         let progressPct = 0;
         const upcoming = data.upcoming_stations || [];
         
-        if (upcoming.length > 0) {
+        if (destinationReached) {
+            progressPct = 100;
+        } else if (upcoming.length > 0) {
             const firstSt = upcoming[0];
             const lastSt = upcoming[upcoming.length - 1];
             
@@ -596,19 +624,21 @@ class App {
         }
         
         // If en route, ensure progress percentage realistically reflects journey (bounded 5% - 95%)
-        if (progressPct <= 0 && data.status !== 'completed') {
+        if (!destinationReached && progressPct <= 0 && data.status !== 'completed') {
             progressPct = Math.max(5, Math.round((data.segment_progress || 0.05) * 100));
         }
-        progressPct = Math.min(95, Math.max(5, progressPct));
+        if (!destinationReached) {
+            progressPct = Math.min(95, Math.max(5, progressPct));
+        }
         
         const pctEl = document.getElementById('progress-pct');
         if (pctEl) pctEl.textContent = `${progressPct}%`;
         
         // Update horizontal progress line width + train icon position
-        const progressLine = document.getElementById('progress-line') || document.querySelector('#tracking-dashboard .absolute.top-0.left-6.h-1\\.5.bg-\\[\\#1268E8\\]');
+        const progressLine = document.getElementById('progress-line');
         if (progressLine) progressLine.style.width = `${progressPct}%`;
-        const trainIcon = document.getElementById('progress-train-icon') || document.querySelector('#tracking-dashboard .absolute.-top-3.z-10');
-        if (trainIcon) trainIcon.style.left = `calc(${progressPct}% + 1rem)`;
+        const trainIcon = document.getElementById('progress-train-icon');
+        if (trainIcon) trainIcon.style.left = `calc(${progressPct}% - 1rem)`;
         
         // ===== ETA & Times =====
         if (data.next_station_eta) {
@@ -741,10 +771,25 @@ class App {
         const infoConfidence = document.getElementById('info-confidence');
         if (infoConfidence) infoConfidence.textContent = data.eta_confidence || 'LOW';
         
+        // ===== Train Run Days =====
+        const trainRunDays = document.getElementById('train-run-days');
+        if (trainRunDays && data.run_days) {
+            let runText = 'Runs Daily';
+            if (Array.isArray(data.run_days) && data.run_days.length > 0 && data.run_days.length < 7) {
+                const daysMap = { 'mon': 'Mon', 'tue': 'Tue', 'wed': 'Wed', 'thu': 'Thu', 'fri': 'Fri', 'sat': 'Sat', 'sun': 'Sun' };
+                runText = 'Runs on ' + data.run_days.map(d => daysMap[d.toLowerCase()] || d).join(', ');
+            }
+            trainRunDays.innerHTML = `<i data-lucide="calendar" class="w-4 h-4 text-[#1268E8]"></i> ${runText}`;
+            if (window.lucide) window.lucide.createIcons();
+        }
+        
         // ===== Movement Status =====
         const movStatus = document.getElementById('movement-status');
         if (movStatus) {
-            if (delayMins > 60) {
+            if (data.status === 'not-started' || data.status === 'upcoming') {
+                movStatus.textContent = 'Yet to Depart';
+                movStatus.className = 'font-extrabold text-[#8A9CBE] text-[18px] leading-tight mb-1';
+            } else if (delayMins > 60) {
                 movStatus.textContent = 'Severely Delayed';
                 movStatus.className = 'font-extrabold text-[#FF3B30] text-[18px] leading-tight mb-1';
             } else if (delayMins > 15) {

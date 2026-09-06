@@ -232,7 +232,8 @@ def get_live_data(train_number: int) -> dict[str, Any]:
             result["_provider_mode"] = "LIVE"
             return result
         except Exception as e:
-            logger.warning("Live RailRadar fetch failed for train %d (%s); using resilient simulator", train_number, e)
+            logger.warning("Live RailRadar fetch failed for train %d (%s); raising error", train_number, e)
+            raise HTTPException(status_code=502, detail=f"Failed to fetch live data from RailRadar: {str(e)}")
     
     live_sim, _ = generate_simulated_train_data(train_number)
     live_sim["_provider_mode"] = "SIMULATION_FALLBACK"
@@ -249,7 +250,8 @@ def get_route_data(train_number: int) -> dict[str, Any]:
             result["_provider_mode"] = "LIVE"
             return result
         except Exception as e:
-            logger.warning("Route RailRadar fetch failed for train %d (%s); using resilient simulator", train_number, e)
+            logger.warning("Route RailRadar fetch failed for train %d (%s); raising error", train_number, e)
+            raise HTTPException(status_code=502, detail=f"Failed to fetch route data from RailRadar: {str(e)}")
     
     _, route_sim = generate_simulated_train_data(train_number)
     route_sim["_provider_mode"] = "SIMULATION_FALLBACK"
@@ -777,6 +779,8 @@ def predict(
         return {
             "train": train_number,
             "train_name": live_data.get("trainName", f"Train #{train_number}"),
+            "status": live_data.get("status", "running"),
+            "run_days": live_data.get("train", {}).get("runDays", []),
             "current_station": current_station,
             "current_station_name": current_station_name,
             "next_station": next_station,

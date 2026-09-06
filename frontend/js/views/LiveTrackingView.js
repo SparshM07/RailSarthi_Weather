@@ -133,7 +133,7 @@ export function renderLiveTrackingView(appContainer) {
                             <span class="flex items-center gap-2 bg-[#f0f5fc] text-[#071B4A] px-4 py-1.5 rounded-full text-[14px] font-medium border border-blue-100">
                                 <i data-lucide="train" class="w-4 h-4 text-[#1268E8]"></i> Superfast Express
                             </span>
-                            <span class="flex items-center gap-2 bg-[#f0f5fc] text-[#071B4A] px-4 py-1.5 rounded-full text-[14px] font-medium border border-blue-100">
+                            <span id="train-run-days" class="flex items-center gap-2 bg-[#f0f5fc] text-[#071B4A] px-4 py-1.5 rounded-full text-[14px] font-medium border border-blue-100">
                                 <i data-lucide="calendar" class="w-4 h-4 text-[#1268E8]"></i> Runs Daily
                             </span>
                             <span class="flex items-center gap-2 bg-[#f0f5fc] text-[#071B4A] px-4 py-1.5 rounded-full text-[14px] font-medium border border-blue-100">
@@ -194,14 +194,17 @@ export function renderLiveTrackingView(appContainer) {
                         
                         <!-- Horizontal Timeline -->
                         <div class="relative w-full px-6 sm:px-12 mt-12 mb-10">
-                            <!-- Background Line -->
-                            <div class="absolute top-0 left-6 right-6 h-1.5 bg-[#E2E8F0] rounded-full"></div>
-                            <!-- Progress Line -->
-                            <div id="progress-line" class="absolute top-0 left-6 h-1.5 bg-[#1268E8] rounded-full z-0" style="width: 38%;"></div>
-                            
-                            <!-- Train Icon positioned on line -->
-                            <div id="progress-train-icon" class="absolute -top-3 z-10 text-[#1268E8]" style="left: calc(38% + 1rem);">
-                                <i data-lucide="train-front" class="w-8 h-8 bg-white rounded-full"></i>
+                            <!-- Background & Progress Lines Wrapper -->
+                            <div class="absolute top-0 left-6 right-6 sm:left-12 sm:right-12 h-1.5">
+                                <!-- Background Line -->
+                                <div class="absolute inset-0 bg-[#E2E8F0] rounded-full"></div>
+                                <!-- Progress Line -->
+                                <div id="progress-line" class="absolute top-0 left-0 h-1.5 bg-[#1268E8] rounded-full z-0" style="width: 38%;"></div>
+                                
+                                <!-- Train Icon positioned on line -->
+                                <div id="progress-train-icon" class="absolute -top-3 z-10 text-[#1268E8]" style="left: calc(38% - 1rem);">
+                                    <i data-lucide="train-front" class="w-8 h-8 bg-white rounded-full"></i>
+                                </div>
                             </div>
                             
                             <!-- Timeline Nodes -->
