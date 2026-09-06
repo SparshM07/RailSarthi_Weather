@@ -207,7 +207,7 @@ export function renderHomeView(appContainer) {
                     <div class="text-sm text-red-500 mt-1 font-bold">+5 min from schedule</div>
                 </div>
                 
-                <button class="btn-primary w-full shadow-none" onclick="document.dispatchEvent(new Event('NAV_TRACK'))">
+                <button class="btn-primary w-full shadow-none" onclick="document.dispatchEvent(new CustomEvent('DO_SEARCH', { detail: { train: '12919' } }))">
                     View Live Train &rarr;
                 </button>
             </div>

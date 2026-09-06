@@ -3,6 +3,7 @@
 const STORAGE_KEY = 'railsarthi_app_state';
 
 const defaultState = {
+    selectedTrain: null,
     savedTrains: [], // Array of { trainNumber, trainName }
     recentSearches: [],
     settings: {
@@ -32,6 +33,23 @@ export const store = {
         } catch (e) {
             console.error('Failed to save state to localStorage', e);
         }
+    },
+
+    setSelectedTrain(trainNumber) {
+        this.state.selectedTrain = trainNumber ? String(trainNumber) : null;
+        this.save();
+    },
+
+    getSelectedTrain() {
+        return this.state.selectedTrain || null;
+    },
+
+    clearSelectedTrain() {
+        this.state.selectedTrain = null;
+        try {
+            localStorage.removeItem('selectedTrain');
+        } catch (e) {}
+        this.save();
     },
     
     addSavedTrain(trainNumber, trainName) {

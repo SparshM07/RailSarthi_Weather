@@ -101,6 +101,9 @@ class App {
                     document.dispatchEvent(new CustomEvent('DO_SEARCH', { detail: { train } }));
                 }, 100);
             }
+        } else if (viewId === 'live') {
+            store.clearSelectedTrain();
+            this.currentTrain = null;
         }
     }
 
@@ -113,7 +116,12 @@ class App {
     }
 
     navigate(viewId) {
-        if (this.currentView === viewId) return;
+        if (this.currentView === viewId) {
+            if (viewId === 'live') {
+                this.resetLiveTrackingSearch();
+            }
+            return;
+        }
         this.currentView = viewId;
         window.location.hash = viewId;
         this.renderShell();
@@ -124,6 +132,49 @@ class App {
             clearInterval(this.autoRefreshInterval);
             this.autoRefreshInterval = null;
         }
+        if (viewId === 'live') {
+            this.resetLiveTrackingSearch();
+        }
+    }
+
+    resetLiveTrackingSearch() {
+        this.searchSeq = (this.searchSeq || 0) + 1;
+        this.currentTrain = null;
+        if (this.autoRefreshInterval) {
+            clearInterval(this.autoRefreshInterval);
+            this.autoRefreshInterval = null;
+        }
+        store.clearSelectedTrain();
+
+        const dashboard = document.getElementById('tracking-dashboard');
+        const mapRouteSection = document.getElementById('map-route-section');
+        const searchSection = document.getElementById('search-section');
+        const emptyState = document.getElementById('empty-state');
+        const input = document.getElementById('live-train-input');
+
+        if (dashboard) {
+            dashboard.classList.add('hidden');
+            dashboard.classList.remove('flex');
+        }
+        if (mapRouteSection) {
+            mapRouteSection.classList.add('hidden');
+            mapRouteSection.classList.remove('flex');
+        }
+        if (searchSection) {
+            searchSection.classList.remove('hidden');
+        }
+        if (emptyState) {
+            emptyState.classList.remove('hidden');
+        }
+        if (input) {
+            input.value = '';
+        }
+
+        const currentHash = window.location.hash.slice(1);
+        if (currentHash !== 'live') {
+            window.history.pushState(null, null, '#live');
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     mountView(viewId) {
@@ -155,27 +206,67 @@ class App {
             default:
                 renderHomeView(this.appContainer);
         }
+
+        // Always sync scroll
+        window.scrollTo(0, 0);
     }
 
     setupEventListeners() {
         window.addEventListener('hashchange', () => {
             const hash = window.location.hash.slice(1);
-            const [viewId] = hash.split('?');
+            const [viewId, qs] = hash.split('?');
             const targetView = viewId || 'home';
+            const params = qs ? new URLSearchParams(qs) : null;
+            const targetTrain = (targetView === 'live' && params) ? params.get('train') : null;
+
             if (this.currentView !== targetView) {
                 this.currentView = targetView;
                 this.renderShell();
                 this.mountView(this.currentView);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                if (targetView === 'live') {
+                    if (targetTrain) {
+                        setTimeout(() => {
+                            document.dispatchEvent(new CustomEvent('DO_SEARCH', { detail: { train: targetTrain } }));
+                        }, 100);
+                    } else {
+                        this.resetLiveTrackingSearch();
+                    }
+                } else if (this.autoRefreshInterval) {
+                    clearInterval(this.autoRefreshInterval);
+                    this.autoRefreshInterval = null;
+                }
+            } else if (targetView === 'live') {
+                if (targetTrain && targetTrain !== this.currentTrain) {
+                    document.dispatchEvent(new CustomEvent('DO_SEARCH', { detail: { train: targetTrain } }));
+                } else if (!targetTrain && this.currentTrain) {
+                    this.resetLiveTrackingSearch();
+                }
             }
         });
 
-        document.addEventListener('NAV_TRACK', () => this.navigate('live'));
+        document.addEventListener('NAV_TRACK', (e) => {
+            if (e.detail && e.detail.train) {
+                document.dispatchEvent(new CustomEvent('DO_SEARCH', { detail: { train: e.detail.train } }));
+            } else {
+                this.navigate('live');
+            }
+        });
+
+        document.addEventListener('RESET_LIVE_SEARCH', () => {
+            this.resetLiveTrackingSearch();
+        });
         
         document.addEventListener('DO_SEARCH', async (e) => {
             const { train } = e.detail;
+            if (!train) return;
+
             if (this.currentView !== 'live') {
-                this.navigate('live');
+                this.currentView = 'live';
+                this.renderShell();
+                this.mountView('live');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             }
             
             // Allow DOM to settle
@@ -198,7 +289,10 @@ class App {
     }
 
     async performLiveSearch(trainNumber, isAutoRefresh = false) {
-        this.currentTrain = trainNumber;
+        this.searchSeq = (this.searchSeq || 0) + 1;
+        const currentSeq = this.searchSeq;
+        this.currentTrain = String(trainNumber);
+        store.setSelectedTrain(trainNumber);
         
         try {
             // Show loading state (could add skeleton loaders here)
@@ -213,6 +307,10 @@ class App {
 
             const data = await fetchLivePrediction(trainNumber);
             
+            if (currentSeq !== this.searchSeq) {
+                return;
+            }
+
             store.addRecentSearch(trainNumber, data.train_name);
             store.addSavedTrain(trainNumber, data.train_name); // Auto save
 
@@ -246,6 +344,7 @@ class App {
             }
 
         } catch (error) {
+            if (currentSeq !== this.searchSeq) return;
             alert(error.message);
             const btn = document.querySelector('#live-search-form button');
             if(btn) btn.innerHTML = 'Check Status &rarr;';

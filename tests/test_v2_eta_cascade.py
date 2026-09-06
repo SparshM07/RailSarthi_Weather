@@ -323,6 +323,50 @@ class ProductionEtaCascadeTests(unittest.TestCase):
             if val is not None:
                 self.assertFalse(math.isnan(val))
 
+    def test_intermediate_station_missing_timetable_scheduled_segment_minutes_remains_nan(self):
+        """Verify that when an intermediate stop lacks both arrival and departure timetable,
+        scheduled_segment_minutes for the subsequent adjacent segment remains NaN rather than
+        fabricating a multi-hop interval.
+        """
+        mock_model = MockModelContainer()
+        route_with_missing_timetable = [
+            {"stationCode": "ORIGIN", "sequence": 1, "scheduledDeparture": "2026-09-03T10:00:00+05:30"},
+            {"stationCode": "HOP1", "sequence": 2, "scheduledArrival": "2026-09-03T10:30:00+05:30", "scheduledDeparture": "2026-09-03T10:35:00+05:30"},
+            {"stationCode": "HOP2", "sequence": 3},  # completely missing arrival and departure
+            {"stationCode": "HOP3", "sequence": 4, "scheduledArrival": "2026-09-03T12:00:00+05:30", "scheduledDeparture": "2026-09-03T12:05:00+05:30"},
+        ]
+        results = build_upcoming_eta(
+            live_data={"route": route_with_missing_timetable},
+            current_station="ORIGIN",
+            next_station="HOP1",
+            current_delay=10.0,
+            predicted_delay=12.0,
+            segment_progress=0.0,
+            scheduled_segment_minutes=30.0,
+            historical_stats={"lookup_scope": "GLOBAL", "count": 10},
+            current_time=self.now,
+            model_container=mock_model,
+            segment_stats_index=segment_stats_index,
+        )
+        self.assertEqual(len(results), 3)
+        self.assertEqual(len(mock_model.call_history), 2)  # Hops 2 and 3
+
+        # Hop 2 (HOP1 -> HOP2): HOP2 has no scheduledArrival, duration is NaN
+        hop2_input = mock_model.call_history[0]
+        self.assertEqual(hop2_input["station"], "HOP1")
+        self.assertEqual(hop2_input["next_station"], "HOP2")
+        self.assertTrue(math.isnan(hop2_input["scheduled_segment_minutes"]))
+
+        # Hop 3 (HOP2 -> HOP3): HOP2 had NO timetable data, duration MUST remain NaN (not 85.0 mins)
+        hop3_input = mock_model.call_history[1]
+        self.assertEqual(hop3_input["station"], "HOP2")
+        self.assertEqual(hop3_input["next_station"], "HOP3")
+        self.assertTrue(
+            math.isnan(hop3_input["scheduled_segment_minutes"]),
+            f"Expected NaN for HOP2->HOP3 scheduled_segment_minutes, but got {hop3_input['scheduled_segment_minutes']}"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
+

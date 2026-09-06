@@ -53,7 +53,7 @@ export function renderLiveTrackingView(appContainer) {
                     <button type="button" class="bg-white/60 backdrop-blur-sm border border-white rounded-full px-4 py-1.5 text-[13px] hover:bg-white transition-colors shadow-sm text-[#5C6E94]" onclick="document.getElementById('live-train-input').value='12919'; document.getElementById('live-search-form').dispatchEvent(new Event('submit'))"><span class="text-[#1268E8] font-bold mr-1.5">12919</span>Malwa</button>
                     <button type="button" class="bg-white/60 backdrop-blur-sm border border-white rounded-full px-4 py-1.5 text-[13px] hover:bg-white transition-colors shadow-sm text-[#5C6E94]" onclick="document.getElementById('live-train-input').value='12002'; document.getElementById('live-search-form').dispatchEvent(new Event('submit'))"><span class="text-[#1268E8] font-bold mr-1.5">12002</span>New Delhi</button>
                     <button type="button" class="bg-white/60 backdrop-blur-sm border border-white rounded-full px-4 py-1.5 text-[13px] hover:bg-white transition-colors shadow-sm text-[#5C6E94]" onclick="document.getElementById('live-train-input').value='22436'; document.getElementById('live-search-form').dispatchEvent(new Event('submit'))"><span class="text-[#1268E8] font-bold mr-1.5">22436</span>Vande Bharat</button>
-                    <button type="button" class="bg-white/60 backdrop-blur-sm border border-white rounded-full px-4 py-1.5 text-[13px] hover:bg-white transition-colors shadow-sm text-[#5C6E94]" onclick="document.getElementById('live-train-input').value='12618'; document.getElementById('live-search-form').dispatchEvent(new Event('submit'))"><span class="text-[#1268E8] font-bold mr-1.5">12618</span>Mangala</button>
+                    <button type="button" class="bg-white/60 backdrop-blur-sm border border-white rounded-full px-4 py-1.5 text-[13px] hover:bg-white transition-colors shadow-sm text-[#5C6E94]" onclick="document.getElementById('live-train-input').value='12424'; document.getElementById('live-search-form').dispatchEvent(new Event('submit'))"><span class="text-[#1268E8] font-bold mr-1.5">12424</span>Dibrugarh Rajdhani</button>
                     <button type="button" class="bg-white/60 backdrop-blur-sm border border-white rounded-full px-4 py-1.5 text-[13px] hover:bg-white transition-colors shadow-sm text-[#5C6E94]" onclick="document.getElementById('live-train-input').value='12952'; document.getElementById('live-search-form').dispatchEvent(new Event('submit'))"><span class="text-[#1268E8] font-bold mr-1.5">12952</span>Mumbai Rajdhani</button>
                 </div>
 
@@ -99,13 +99,13 @@ export function renderLiveTrackingView(appContainer) {
                         </div>
                         
                         <!-- Card 4 -->
-                        <div class="bg-white/80 backdrop-blur-sm border border-white/60 rounded-2xl p-5 flex items-center gap-4 hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] cursor-pointer transition-all" onclick="document.getElementById('live-train-input').value='12618'; document.getElementById('live-search-form').dispatchEvent(new Event('submit'))">
+                        <div class="bg-white/80 backdrop-blur-sm border border-white/60 rounded-2xl p-5 flex items-center gap-4 hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] cursor-pointer transition-all" onclick="document.getElementById('live-train-input').value='12424'; document.getElementById('live-search-form').dispatchEvent(new Event('submit'))">
                             <div class="w-12 h-12 rounded-[14px] bg-orange-50 text-[#FF9500] flex items-center justify-center shrink-0">
                                 <i data-lucide="ticket" class="w-6 h-6"></i>
                             </div>
                             <div>
-                                <div class="font-bold text-[#071B4A] text-[15px]">12618</div>
-                                <div class="text-[13px] text-[#5C6E94]">Mangala Express</div>
+                                <div class="font-bold text-[#071B4A] text-[15px]">12424</div>
+                                <div class="text-[13px] text-[#5C6E94]">Dibrugarh Rajdhani</div>
                             </div>
                         </div>
                     </div>
@@ -116,7 +116,7 @@ export function renderLiveTrackingView(appContainer) {
             <div id="tracking-dashboard" class="hidden flex-col gap-6 w-full mt-4">
                 
                 <!-- Back Button -->
-                <button id="btn-back-search" class="flex items-center gap-2 text-[#5C6E94] font-medium hover:text-[#071B4A] transition-colors mb-2 w-fit" onclick="document.getElementById('tracking-dashboard').classList.add('hidden'); document.getElementById('search-section').classList.remove('hidden'); window.history.pushState(null, null, '#live'); document.getElementById('live-train-input').value = '';">
+                <button id="btn-back-search" class="flex items-center gap-2 text-[#5C6E94] font-medium hover:text-[#071B4A] transition-colors mb-2 w-fit" onclick="document.dispatchEvent(new CustomEvent('RESET_LIVE_SEARCH'))">
                     <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Search
                 </button>
                 
@@ -652,7 +652,7 @@ function setupLiveTrackingEvents(view) {
     const refreshBtn = view.querySelector('#refresh-data-btn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', () => {
-            const train = view.querySelector('#live-train-input').value;
+            const train = (window.app && window.app.currentTrain) || view.querySelector('#live-train-input').value;
             if (train) {
                 // Spin icon temporarily
                 const icon = refreshBtn.querySelector('i');

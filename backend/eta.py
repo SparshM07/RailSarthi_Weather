@@ -225,35 +225,24 @@ def build_upcoming_eta(
             or previous_stop.get("station_code")
         )
 
-        prev_scheduled_arrival = parse_datetime(previous_stop.get("scheduledArrival"))
-        prev_scheduled_departure = parse_datetime(previous_stop.get("scheduledDeparture"))
         current_scheduled_arrival = parse_datetime(stop.get("scheduledArrival"))
         current_scheduled_departure = parse_datetime(stop.get("scheduledDeparture"))
 
-        if prev_scheduled_arrival and previous_scheduled_ref:
-            while prev_scheduled_arrival < previous_scheduled_ref:
-                prev_scheduled_arrival += timedelta(days=1)
-
-        prev_dep_ref = prev_scheduled_departure or prev_scheduled_arrival or previous_scheduled_ref
-        if prev_scheduled_departure and prev_scheduled_arrival:
-            while prev_scheduled_departure < prev_scheduled_arrival:
-                prev_scheduled_departure += timedelta(days=1)
-        elif prev_scheduled_departure and previous_scheduled_ref:
-            while prev_scheduled_departure < previous_scheduled_ref:
-                prev_scheduled_departure += timedelta(days=1)
-
-        departure_checkpoint = prev_scheduled_departure or prev_scheduled_arrival or prev_dep_ref
-
-        if current_scheduled_arrival and departure_checkpoint:
-            while current_scheduled_arrival < departure_checkpoint:
+        if current_scheduled_arrival and previous_scheduled_ref:
+            while current_scheduled_arrival < previous_scheduled_ref:
                 current_scheduled_arrival += timedelta(days=1)
 
         if current_scheduled_departure and current_scheduled_arrival:
             while current_scheduled_departure < current_scheduled_arrival:
                 current_scheduled_departure += timedelta(days=1)
-        elif current_scheduled_departure and departure_checkpoint:
-            while current_scheduled_departure < departure_checkpoint:
+        elif current_scheduled_departure and previous_scheduled_ref:
+            while current_scheduled_departure < previous_scheduled_ref:
                 current_scheduled_departure += timedelta(days=1)
+
+        prev_has_schedule = bool(
+            previous_stop.get("scheduledDeparture") or previous_stop.get("scheduledArrival")
+        )
+        departure_checkpoint = previous_scheduled_ref if prev_has_schedule else None
 
         if departure_checkpoint and current_scheduled_arrival:
             diff_mins = (current_scheduled_arrival - departure_checkpoint).total_seconds() / 60.0
@@ -329,10 +318,6 @@ def build_upcoming_eta(
             travel_minutes = 5.0
             if not math.isnan(hop_scheduled_minutes) and hop_scheduled_minutes > 0:
                 travel_minutes = hop_scheduled_minutes
-            elif prev_scheduled_arrival and current_scheduled_arrival:
-                diff_arr = (current_scheduled_arrival - prev_scheduled_arrival).total_seconds() / 60.0
-                if diff_arr > 0:
-                    travel_minutes = diff_arr
             pred_arrival = previous_eta + timedelta(minutes=travel_minutes)
             eta_method = "first_station_eta_plus_scheduled_arrival_interval"
 
