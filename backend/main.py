@@ -914,7 +914,7 @@ def predict(
         return {
             "train": train_number,
             "train_name": live_data.get("trainName", f"Train #{train_number}"),
-            "status": live_data.get("status", "running"),
+            "train_status": live_data.get("status", "running"),
             "run_days": live_data.get("train", {}).get("runDays", []),
             "current_station": current_station,
             "current_station_name": current_station_name,

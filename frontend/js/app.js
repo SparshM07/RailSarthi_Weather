@@ -629,7 +629,8 @@ class App {
         }
 
         // If en route, ensure progress percentage realistically reflects journey (bounded 5% - 95%)
-        if (!destinationReached && progressPct <= 0 && data.status !== 'completed') {
+        const trainOpStatus = data.train_status || data.status;
+        if (!destinationReached && progressPct <= 0 && trainOpStatus !== 'completed') {
             progressPct = Math.max(5, Math.round((data.segment_progress || 0.05) * 100));
         }
         if (!destinationReached) {
@@ -802,7 +803,8 @@ class App {
         // ===== Movement Status =====
         const movStatus = document.getElementById('movement-status');
         if (movStatus) {
-            if (data.status === 'not-started' || data.status === 'upcoming') {
+            const trainOpStatus = data.train_status || data.status;
+            if (trainOpStatus === 'not-started' || trainOpStatus === 'upcoming') {
                 movStatus.textContent = 'Yet to Depart';
                 movStatus.className = 'font-extrabold text-[#8A9CBE] text-[18px] leading-tight mb-1';
             } else if (delayMins > 60) {

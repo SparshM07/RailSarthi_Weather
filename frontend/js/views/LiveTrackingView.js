@@ -244,8 +244,8 @@ export function renderLiveTrackingView(appContainer) {
                                     </div>
                                     <div class="flex flex-col items-center w-32 text-center absolute top-6">
                                         <div class="font-extrabold text-[#071B4A] text-[15px]" id="final-station-name">New Delhi</div>
-                                        <div class="text-[#5C6E94] text-[13px] font-medium my-0.5">Expected Today</div>
-                                        <div class="text-[#8A9CBE] text-[13px] font-bold">---</div>
+                                        <div class="text-[#5C6E94] text-[13px] font-medium my-0.5" id="final-station-time">Expected Today</div>
+                                        <div class="text-[#8A9CBE] text-[13px] font-bold" id="final-station-status">---</div>
                                     </div>
                                 </div>
                                 
