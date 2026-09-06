@@ -317,7 +317,13 @@ else:
 @app.middleware("http")
 async def protect_and_observe_requests(request: Request, call_next):
     """Add request IDs, per-client sliding window abuse prevention, and latency tracing."""
-    if request.url.path not in {"/", "/app", "/health", "/docs", "/openapi.json", "/redoc", "/trains"}:
+    
+    # Do not rate limit static assets or health checks
+    path = request.url.path
+    is_static = path.startswith(("/static", "/assets", "/css", "/js")) or path == "/favicon.ico"
+    is_exempt = path in {"/", "/app", "/health", "/docs", "/openapi.json", "/redoc", "/trains"}
+    
+    if not (is_static or is_exempt):
         client = request.client.host if request.client else "unknown"
         if not request_limiter.allow(client):
             runtime_metrics.increment("http.rate_limited")

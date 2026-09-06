@@ -34,6 +34,7 @@ export function renderNavbar(activeTab, onTabChange) {
         { id: 'live', label: 'Live Tracking' },
         { id: 'journey', label: 'Journey Simulator' },
         { id: 'insights', label: 'Insights' },
+        { id: 'control', label: '<span class="flex items-center gap-1.5"><i data-lucide="siren" class="w-4 h-4 text-red-500"></i> Control Room</span>' },
         { id: 'about', label: 'About' }
     ];
 

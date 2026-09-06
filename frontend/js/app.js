@@ -7,10 +7,12 @@ import { renderInsightsView } from './views/InsightsView.js';
 import { renderAlertsView } from './views/AlertsView.js';
 import { renderAboutView } from './views/AboutView.js';
 import { renderModelView } from './views/StaticViews.js';
+import { renderControlRoomView } from './views/ControlRoomView.js';
+import { renderNetworkView } from './views/NetworkView.js';
 import { fetchLivePrediction, fetchJourneyPrediction, fetchTrainsCatalog, fetchSimulationPrediction } from './api.js';
 
 // Predefined authoritative train routes for full-route journey tracking
-const POPULAR_TRAIN_ROUTES = {
+export const POPULAR_TRAIN_ROUTES = {
     12919: [
         { code: 'DADN', name: 'Dr. Ambedkar Nagar', distance: 0, sch_arr: '11:50', sch_dep: '12:15', coordinates: [75.7667, 22.5500] },
         { code: 'INDB', name: 'Indore Junction', distance: 21, sch_arr: '12:45', sch_dep: '12:55', coordinates: [75.8648, 22.7196] },
@@ -202,6 +204,9 @@ class App {
                 break;
             case 'model':
                 renderModelView(this.appContainer);
+                break;
+            case 'control':
+                renderControlRoomView(this.appContainer);
                 break;
             default:
                 renderHomeView(this.appContainer);
@@ -1749,7 +1754,8 @@ class App {
                 return `${hours}h ${mins}m`;
             };
 
-            document.getElementById('sim-dest-label').textContent = features.to;
+            const destLabel = document.getElementById('sim-dest-label');
+            if (destLabel) destLabel.textContent = features.to;
             document.getElementById('sim-eta-time').textContent = formatDuration(predictedDuration);
             document.getElementById('sim-sch-time').textContent = formatDuration(scheduledDuration);
             document.getElementById('sim-eta-diff').textContent = predictedDelay ? `+${predictedDelay} min delay` : 'On schedule';
